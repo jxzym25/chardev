@@ -11,8 +11,7 @@
 /* forward declaration */
 int onebyte_open(struct inode *inode, struct file *filep);
 int onebyte_release(struct inode *inode, struct file *filep);
-ssize_t onebyte_read(struct file *filep, char *buf, size_t
-count, loff_t *f_pos);
+ssize_t onebyte_read(struct file *filep, char *buf, size_t count, loff_t *f_pos);
 ssize_t onebyte_write(struct file *filep, const char *buf,
 size_t count, loff_t *f_pos);
 static void onebyte_exit(void);
@@ -25,6 +24,7 @@ struct file_operations onebyte_fops = {
 	release: onebyte_release
 };
 char *onebyte_data = NULL;
+int msgSize = 0;
 
 int onebyte_open(struct inode *inode, struct file *filep)
 {
@@ -39,12 +39,23 @@ int onebyte_release(struct inode *inode, struct file *filep)
 ssize_t onebyte_read(struct file *filep, char *buf, size_t count, loff_t *f_pos)
 {
 /*please complete the function on your own*/
-
+   if (msgSize == 0) return 0;
+   put_user(*onebyte_data, buf);
+   msgSize = 0;
+   printk(KERN_INFO "ZYM: copy 1 character");
+   return 1;
 }
 
 ssize_t onebyte_write(struct file *filep, const char *buf, size_t count, loff_t *f_pos)
 {
 /*please complete the function on your own*/
+  if (count != 1){
+    printk(KERN_INFO "ZYM: sent %d characters, more than 1\n", count);
+    return -EFAULT;
+  } else{
+    printk(KERN_INFO "ZYM: print exactly 1 character");
+    return count;
+  }
 }
 
 static int onebyte_init(void)
@@ -67,6 +78,7 @@ static int onebyte_init(void)
   }
   // initialize the value to be X
   *onebyte_data = 'X';
+  msgSize = 1;
   printk(KERN_ALERT "This is a onebyte device module\n");
   return 0;
 }
@@ -78,6 +90,7 @@ static void onebyte_exit(void)
     // free the memory and assign the pointer to NULL
     kfree(onebyte_data);
     onebyte_data = NULL;
+    msgSize = 0;
   }
   // unregister the device
   unregister_chrdev(MAJOR_NUMBER, "onebyte");
