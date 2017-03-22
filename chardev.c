@@ -49,13 +49,14 @@ ssize_t onebyte_read(struct file *filep, char *buf, size_t count, loff_t *f_pos)
 ssize_t onebyte_write(struct file *filep, const char *buf, size_t count, loff_t *f_pos)
 {
 /*please complete the function on your own*/
+  if (count == 0) return 0;
+  get_user(*onebyte_data, buf);
+  msgSize = 1;
   if (count != 1) {
     printk(KERN_ALERT "ZYM: not 1 character given");
     return -ENOSPC;
   }
-  msgSize = 1;
   printk(KERN_ALERT "ZYM: 1 character given");
-  get_user(*onebyte_data, buf);
   return 1;
 }
 
