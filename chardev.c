@@ -60,10 +60,10 @@ ssize_t onebyte_read(struct file *filep, char *buf, size_t count, loff_t *f_pos)
 ssize_t onebyte_write(struct file *filep, const char *buf, size_t count, loff_t *f_pos)
 {
 /*please complete the function on your own*/
-  if (count > NUM_OF_BYTES) {
-    printk(KERN_ALERT "ZYM: %d char given, more than %d character given", count, NUM_OF_BYTES);
-    return -ENOSPC;
-  }
+  //if (count > NUM_OF_BYTES) {
+  //  printk(KERN_ALERT "ZYM: %d char given, more than %d character given", count, NUM_OF_BYTES);
+  //  return -ENOSPC;
+  //}
   if (count == 0) return 0;
   int tempSize = min(count, NUM_OF_BYTES);
   int i;
@@ -73,7 +73,7 @@ ssize_t onebyte_write(struct file *filep, const char *buf, size_t count, loff_t 
 
   msgSize = 1;
   printk(KERN_ALERT "ZYM: %d character given", tempSize);
-  printk(KERN_INFO "ZYM: writing:\n%s", onebyte_data);
+  //printk(KERN_INFO "ZYM: writing:\n%s", onebyte_data);
   return tempSize;
 }
 
