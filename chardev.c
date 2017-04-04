@@ -8,6 +8,7 @@
 #include <linux/proc_fs.h>
 #include <asm/uaccess.h>
 #define MAJOR_NUMBER 61
+#define NUM_OF_BYTES 4096
 /* forward declaration */
 int onebyte_open(struct inode *inode, struct file *filep);
 int onebyte_release(struct inode *inode, struct file *filep);
@@ -40,24 +41,40 @@ ssize_t onebyte_read(struct file *filep, char *buf, size_t count, loff_t *f_pos)
 {
 /*please complete the function on your own*/
    if (msgSize == 0) return 0;
-   put_user(*onebyte_data, buf);
+   int tempSize = min(count, NUM_OF_BYTES);
+   //if (copy_to_user(buf, onebyte_data, tempSize)) {
+   //printk(KERN_INFO "ZYM: copy_to_user fails");
+   //  return -EFAULT;
+   //}
+   int i;
+   for (i = 0; i < tempSize; i++){
+     put_user(onebyte_data[i], buf + i);
+     if (buf[i] == '\0') break;
+   }
+
    msgSize = 0;
-   printk(KERN_INFO "ZYM: copy 1 character");
-   return 1;
+   printk(KERN_INFO "ZYM: copy %d character", i);
+   return i;
 }
 
 ssize_t onebyte_write(struct file *filep, const char *buf, size_t count, loff_t *f_pos)
 {
 /*please complete the function on your own*/
-  if (count == 0) return 0;
-  get_user(*onebyte_data, buf);
-  msgSize = 1;
-  if (count != 1) {
-    printk(KERN_ALERT "ZYM: not 1 character given");
+  if (count > NUM_OF_BYTES) {
+    printk(KERN_ALERT "ZYM: %d char given, more than %d character given", count, NUM_OF_BYTES);
     return -ENOSPC;
   }
-  printk(KERN_ALERT "ZYM: 1 character given");
-  return 1;
+  if (count == 0) return 0;
+  int tempSize = min(count, NUM_OF_BYTES);
+  int i;
+  for (i = 0; i < tempSize; i++)
+    get_user(onebyte_data[i], buf + i);
+  onebyte_data[tempSize] = '\0';
+
+  msgSize = 1;
+  printk(KERN_ALERT "ZYM: %d character given", tempSize);
+  printk(KERN_INFO "ZYM: writing:\n%s", onebyte_data);
+  return tempSize;
 }
 
 static int onebyte_init(void)
@@ -71,7 +88,7 @@ static int onebyte_init(void)
   // allocate one byte of memory for storage
   // kmalloc is just like malloc, the second parameter is// the type of memory to be allocated.
   // To release the memory allocated by kmalloc, use kfree.
-  onebyte_data = kmalloc(sizeof(char), GFP_KERNEL);
+  onebyte_data = kmalloc(sizeof(char)*NUM_OF_BYTES, GFP_KERNEL);
   if (!onebyte_data) {
     onebyte_exit();
     // cannot allocate memory
