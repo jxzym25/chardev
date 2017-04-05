@@ -15,6 +15,8 @@ int onebyte_release(struct inode *inode, struct file *filep);
 ssize_t onebyte_read(struct file *filep, char *buf, size_t count, loff_t *f_pos);
 ssize_t onebyte_write(struct file *filep, const char *buf,
 size_t count, loff_t *f_pos);
+static loff_t onebyte_lseek(struct file *file, loff_t offset, int orig);
+
 static void onebyte_exit(void);
 
 /* definition of file_operation structure */
@@ -22,10 +24,10 @@ struct file_operations onebyte_fops = {
 	read:	onebyte_read,
 	write:	onebyte_write,
 	open:	onebyte_open,
-	release: onebyte_release
+	release: onebyte_release,
+        llseek: onebyte_lseek
 };
 char *onebyte_data = NULL;
-int msgSize = 0;
 
 int onebyte_open(struct inode *inode, struct file *filep)
 {
@@ -40,41 +42,46 @@ int onebyte_release(struct inode *inode, struct file *filep)
 ssize_t onebyte_read(struct file *filep, char *buf, size_t count, loff_t *f_pos)
 {
 /*please complete the function on your own*/
-   if (msgSize == 0) return 0;
-   int tempSize = min(count, NUM_OF_BYTES);
-   //if (copy_to_user(buf, onebyte_data, tempSize)) {
-   //printk(KERN_INFO "ZYM: copy_to_user fails");
-   //  return -EFAULT;
-   //}
-   int i;
-   for (i = 0; i < tempSize; i++){
-     put_user(onebyte_data[i], buf + i);
-     if (buf[i] == '\0') break;
-   }
-
-   msgSize = 0;
-   printk(KERN_INFO "ZYM: copy %d character", i);
-   return i;
+  int maxbytes;
+  int bytes_to_do;
+  int nbytes;
+  maxbytes = NUM_OF_BYTES - *f_pos;
+  if (maxbytes > count)
+    bytes_to_do = count;
+  else
+    bytes_to_do = maxbytes;
+  if (bytes_to_do == 0)
+  {
+    printk(KERN_INFO "ZYM: Reached end of device\n");
+    return -ENOSPC;
+  }
+  nbytes = bytes_to_do - copy_to_user(buf, onebyte_data + *f_pos, bytes_to_do);
+  *f_pos += nbytes;
+  printk(KERN_INFO "ZYM: copy %d character", nbytes);
+  return nbytes;
 }
 
 ssize_t onebyte_write(struct file *filep, const char *buf, size_t count, loff_t *f_pos)
 {
 /*please complete the function on your own*/
-  //if (count > NUM_OF_BYTES) {
-  //  printk(KERN_ALERT "ZYM: %d char given, more than %d character given", count, NUM_OF_BYTES);
-  //  return -ENOSPC;
-  //}
-  if (count == 0) return 0;
-  int tempSize = min(count, NUM_OF_BYTES);
-  int i;
-  for (i = 0; i < tempSize; i++)
-    get_user(onebyte_data[i], buf + i);
-  onebyte_data[tempSize] = '\0';
+  int nbytes;
+  int bytes_to_do;
+  int maxbytes;
+  maxbytes = NUM_OF_BYTES - *f_pos;
+  if (maxbytes > count)
+    bytes_to_do = count;
+  else
+    bytes_to_do = maxbytes;
 
-  msgSize = 1;
-  printk(KERN_ALERT "ZYM: %d character given", tempSize);
+  if (bytes_to_do == 0){
+    printk(KERN_INFO "ZYM: Reached end of device\n");
+    return -ENOSPC;
+  }
+  nbytes = bytes_to_do - copy_from_user(onebyte_data + *f_pos, buf, bytes_to_do);
+  *f_pos += nbytes;
+  printk(KERN_ALERT "ZYM: %d character given\n", nbytes);
   //printk(KERN_INFO "ZYM: writing:\n%s", onebyte_data);
-  return tempSize;
+  return nbytes;
 }
 
 static int onebyte_init(void)
@@ -97,7 +104,6 @@ static int onebyte_init(void)
   }
   // initialize the value to be X
   *onebyte_data = 'X';
-  msgSize = 1;
   printk(KERN_ALERT "This is a onebyte device module\n");
   return 0;
 }
@@ -109,11 +115,31 @@ static void onebyte_exit(void)
     // free the memory and assign the pointer to NULL
     kfree(onebyte_data);
     onebyte_data = NULL;
-    msgSize = 0;
   }
   // unregister the device
   unregister_chrdev(MAJOR_NUMBER, "onebyte");
   printk(KERN_ALERT "Onebyte device module is unloaded\n");
+}
+
+static loff_t onebyte_lseek(struct file *file, loff_t offset, int orig)
+{
+  loff_t new_pos = 0;
+  switch(orig)
+  {
+    case 0:
+      new_pos = offset;
+      break;
+    case 1:
+      new_pos = file->f_pos + offset;
+      break;
+    case 2:
+      new_pos = NUM_OF_BYTES - offset;
+      break;
+  }
+  if (new_pos > NUM_OF_BYTES) new_pos = NUM_OF_BYTES;
+  if (new_pos < 0) new_pos = 0;
+  file->f_pos = new_pos;
+  return new_pos;
 }
 MODULE_LICENSE("GPL");
 module_init(onebyte_init);
