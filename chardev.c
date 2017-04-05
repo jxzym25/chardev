@@ -12,8 +12,11 @@
 #define NUM_OF_BYTES 4096
 #define SCULL_IOC_MAGIC 'k'
 #define SCULL_HELLO _IO(SCULL_IOC_MAGIC, 1)
+#define SCULL_WRITE _IOW(SCULL_IOC_MAGIC, 2, unsigned long)
+#define SCULL_READ  _IOR(SCULL_IOC_MAGIC, 3, unsigned long)
 #define SCULL_IOC_MAXNR 15
 /* forward declaration */
+char dev_msg[NUM_OF_BYTES];
 
 long ioctl_example(struct file *flip, unsigned int cmd, unsigned long arg)
 {
@@ -39,6 +42,35 @@ long ioctl_example(struct file *flip, unsigned int cmd, unsigned long arg)
   return retval;
 }
 
+long ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
+{
+  int err= 0;
+  int tmp;
+  int retval = 0;
+
+  if (_IOC_TYPE(cmd) != SCULL_IOC_MAGIC) return -ENOTTY;
+  if (_IOC_NR(cmd) > SCULL_IOC_MAXNR) return -ENOTTY;
+  
+  if (_IOC_DIR(cmd) & _IOC_READ)
+    err = !access_ok(VERIFY_WRITE, (void __user *)arg, _IOC_SIZE(cmd));
+  else if (_IOC_DIR(cmd) & _IOC_WRITE)
+    err = !access_ok(VERIFY_READ, (void __user *)arg, _IOC_SIZE(cmd));
+  if (err) return -EFAULT;
+  switch(cmd){
+  case SCULL_WRITE:
+    printk(KERN_WARNING "write\n");
+    copy_from_user(dev_msg, (char*)arg, NUM_OF_BYTES);
+    break;
+  case SCULL_READ:
+    printk(KERN_WARNING "read\n");
+    copy_to_user((char*)arg, dev_msg, NUM_OF_BYTES);
+    break;
+  default:
+    return -ENOTTY;
+  }
+  return retval;
+}
+
 int onebyte_open(struct inode *inode, struct file *filep);
 int onebyte_release(struct inode *inode, struct file *filep);
 ssize_t onebyte_read(struct file *filep, char *buf, size_t count, loff_t *f_pos);
@@ -55,7 +87,7 @@ struct file_operations onebyte_fops = {
 	open:	onebyte_open,
 	release: onebyte_release,
         llseek: onebyte_lseek,
-	unlocked_ioctl: ioctl_example
+	unlocked_ioctl: ioctl
 };
 char *onebyte_data = NULL;
 
