@@ -14,6 +14,7 @@
 #define SCULL_HELLO _IO(SCULL_IOC_MAGIC, 1)
 #define SCULL_WRITE _IOW(SCULL_IOC_MAGIC, 2, unsigned long)
 #define SCULL_READ  _IOR(SCULL_IOC_MAGIC, 3, unsigned long)
+#define SCULL_WRITE_READ _IOWR(SCULL_IOC_MAGIC, 4, unsigned long)
 #define SCULL_IOC_MAXNR 15
 /* forward declaration */
 char dev_msg[NUM_OF_BYTES];
@@ -56,6 +57,7 @@ long ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
   else if (_IOC_DIR(cmd) & _IOC_WRITE)
     err = !access_ok(VERIFY_READ, (void __user *)arg, _IOC_SIZE(cmd));
   if (err) return -EFAULT;
+  char temp[NUM_OF_BYTES];
   switch(cmd){
   case SCULL_WRITE:
     printk(KERN_WARNING "write\n");
@@ -64,6 +66,12 @@ long ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
   case SCULL_READ:
     printk(KERN_WARNING "read\n");
     copy_to_user((char*)arg, dev_msg, NUM_OF_BYTES);
+    break;
+  case SCULL_WRITE_READ:
+    copy_from_user(temp, (char*)arg, NUM_OF_BYTES);
+    copy_to_user((char*)arg, dev_msg, NUM_OF_BYTES);
+    strcpy(dev_msg, temp);
+    printk(KERN_WARNING "dev_msg now is %s\n", dev_msg);
     break;
   default:
     return -ENOTTY;
