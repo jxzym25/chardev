@@ -7,9 +7,38 @@
 #include <linux/fs.h>
 #include <linux/proc_fs.h>
 #include <asm/uaccess.h>
+#include <linux/ioctl.h>
 #define MAJOR_NUMBER 61
 #define NUM_OF_BYTES 4096
+#define SCULL_IOC_MAGIC 'k'
+#define SCULL_HELLO _IO(SCULL_IOC_MAGIC, 1)
+#define SCULL_IOC_MAXNR 15
 /* forward declaration */
+
+long ioctl_example(struct file *flip, unsigned int cmd, unsigned long arg)
+{
+  int err= 0;
+  int tmp;
+  int retval = 0;
+
+  if (_IOC_TYPE(cmd) != SCULL_IOC_MAGIC) return -ENOTTY;
+  if (_IOC_NR(cmd) > SCULL_IOC_MAXNR) return -ENOTTY;
+  
+  if (_IOC_DIR(cmd) & _IOC_READ)
+    err = !access_ok(VERIFY_WRITE, (void __user *)arg, _IOC_SIZE(cmd));
+  else if (_IOC_DIR(cmd) & _IOC_WRITE)
+    err = !access_ok(VERIFY_READ, (void __user *)arg, _IOC_SIZE(cmd));
+  if (err) return -EFAULT;
+  switch(cmd){
+  case SCULL_HELLO:
+    printk(KERN_WARNING "hello\n");
+    break;
+  default:
+    return -ENOTTY;
+  }
+  return retval;
+}
+
 int onebyte_open(struct inode *inode, struct file *filep);
 int onebyte_release(struct inode *inode, struct file *filep);
 ssize_t onebyte_read(struct file *filep, char *buf, size_t count, loff_t *f_pos);
@@ -25,7 +54,8 @@ struct file_operations onebyte_fops = {
 	write:	onebyte_write,
 	open:	onebyte_open,
 	release: onebyte_release,
-        llseek: onebyte_lseek
+        llseek: onebyte_lseek,
+	unlocked_ioctl: ioctl_example
 };
 char *onebyte_data = NULL;
 
